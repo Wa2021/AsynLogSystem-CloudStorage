@@ -1,0 +1,58 @@
+[16:06:20][137723871793664[INFO][asynclogger][DataManager.hpp:52]	DataManager construct start
+[16:06:20][137723871793664[INFO][asynclogger][Config.hpp:38]	ReadConfig start
+[16:06:20][137723871793664[INFO][asynclogger][Config.hpp:31]	ReadConfig complicate
+[16:06:20][137723871793664[INFO][asynclogger][DataManager.hpp:67]	init datamanager
+[16:06:20][137723871793664[INFO][asynclogger][DataManager.hpp:58]	DataManager construct end
+[16:06:20][137723683612224[DEBUG][asynclogger][Service.hpp:30]	Service start(Construct)
+[16:06:20][137723683612224[DEBUG][asynclogger][Service.hpp:36]	Service end(Construct)
+[16:06:20][137723683612224[INFO][asynclogger][Test.cpp:17]	service step in RunModule
+[16:06:20][137723683612224[DEBUG][asynclogger][Service.hpp:68]	event_base_dispatch
+[16:08:03][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[16:08:03][137723683612224[INFO][asynclogger][Service.hpp:100]	Unauthorized /, Redirect to login
+[16:08:03][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /login
+[16:08:04][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /favicon.ico
+[16:08:04][137723683612224[INFO][asynclogger][Service.hpp:105]	Unauthorized API call /favicon.ico
+[16:08:05][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /api/login
+[16:08:05][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[16:08:05][137723683612224[INFO][asynclogger][Service.hpp:478]	ListShow()
+[16:08:05][137723683612224[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[16:08:05][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /favicon.ico
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /upload
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:246]	Upload start
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:270]	evbuffer_get_length is 42
+[16:08:14][137723683612224[DEBUG][asynclogger][Service.hpp:317]	storage_path:./deep_storage/test1.txt
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:345]	deep_storage success
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:18]	NewStorageInfo start
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:33]	download_url:/download/test1.txt,mtime_:Wed Mar  4 16:08:14 2026
+,atime_:Wed Mar  4 16:08:14 2026
+,fsize_:42
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:34]	NewStorageInfo end
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:142]	data_message Insert start
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:100]	message storage start
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:123]	new message for StorageInfo:[
+	{
+		"atime_" : 1772611694,
+		"fsize_" : 42,
+		"mtime_" : 1772611694,
+		"storage_path_" : "./deep_storage/test1.txt",
+		"url_" : "/download/test1.txt"
+	}
+]
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:136]	message storage end
+[16:08:14][137723683612224[INFO][asynclogger][DataManager.hpp:151]	data_message Insert end
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:355]	upload finish:success
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:478]	ListShow()
+[16:08:14][137723683612224[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[16:08:34][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /delete
+[16:08:34][137723683612224[INFO][asynclogger][Service.hpp:360]	Delete start
+[16:08:34][137723683612224[ERROR][asynclogger][Service.hpp:394]	remove file failed: ./deep_storage/test1.txt, errno: 2
+[16:08:34][137723683612224[INFO][asynclogger][DataManager.hpp:172]	data_message Delete start, url: /download/test1.txt
+[16:08:34][137723683612224[INFO][asynclogger][DataManager.hpp:100]	message storage start
+[16:08:34][137723683612224[INFO][asynclogger][DataManager.hpp:123]	new message for StorageInfo:null
+[16:08:34][137723683612224[INFO][asynclogger][DataManager.hpp:136]	message storage end
+[16:08:34][137723683612224[INFO][asynclogger][DataManager.hpp:190]	data_message Delete end
+[16:08:34][137723683612224[INFO][asynclogger][Service.hpp:405]	Delete Meta Success: /download/test1.txt
+[16:08:35][137723683612224[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[16:08:35][137723683612224[INFO][asynclogger][Service.hpp:478]	ListShow()
+[16:08:35][137723683612224[INFO][asynclogger][Service.hpp:516]	ListShow() finish

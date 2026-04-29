@@ -1,0 +1,62 @@
+[21:02:25][136521299780096[INFO][asynclogger][DataManager.hpp:52]	DataManager construct start
+[21:02:25][136521299780096[INFO][asynclogger][Config.hpp:38]	ReadConfig start
+[21:02:25][136521299780096[INFO][asynclogger][Config.hpp:31]	ReadConfig complicate
+[21:02:25][136521299780096[INFO][asynclogger][DataManager.hpp:67]	init datamanager
+[21:02:25][136521299780096[INFO][asynclogger][DataManager.hpp:70]	there is no storage file info need to load
+[21:02:25][136521299780096[INFO][asynclogger][DataManager.hpp:58]	DataManager construct end
+[21:02:25][136521038427712[DEBUG][asynclogger][Service.hpp:30]	Service start(Construct)
+[21:02:25][136521038427712[DEBUG][asynclogger][Service.hpp:36]	Service end(Construct)
+[21:02:25][136521038427712[INFO][asynclogger][Test.cpp:17]	service step in RunModule
+[21:02:25][136521038427712[DEBUG][asynclogger][Service.hpp:68]	event_base_dispatch
+[21:03:24][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[21:03:24][136521038427712[INFO][asynclogger][Service.hpp:478]	ListShow()
+[21:03:24][136521038427712[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[21:03:25][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /login
+[21:03:26][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /api/login
+[21:03:26][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[21:03:26][136521038427712[INFO][asynclogger][Service.hpp:478]	ListShow()
+[21:03:26][136521038427712[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /upload
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:246]	Upload start
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:270]	evbuffer_get_length is 109856
+[21:03:34][136521038427712[DEBUG][asynclogger][Service.hpp:317]	storage_path:./deep_storage/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:345]	deep_storage success
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:18]	NewStorageInfo start
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:33]	download_url:/download/南京邮电大学大学生菁英人才学校学员信息登记表.docx,mtime_:Tue Mar  3 21:03:34 2026
+,atime_:Tue Mar  3 21:03:34 2026
+,fsize_:107691
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:34]	NewStorageInfo end
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:142]	data_message Insert start
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:100]	message storage start
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:123]	new message for StorageInfo:[
+	{
+		"atime_" : 1772543014,
+		"fsize_" : 107691,
+		"mtime_" : 1772543014,
+		"storage_path_" : "./deep_storage/南京邮电大学大学生菁英人才学校学员信息登记表.docx",
+		"url_" : "/download/南京邮电大学大学生菁英人才学校学员信息登记表.docx"
+	}
+]
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:136]	message storage end
+[21:03:34][136521038427712[INFO][asynclogger][DataManager.hpp:151]	data_message Insert end
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:355]	upload finish:success
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:478]	ListShow()
+[21:03:34][136521038427712[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[21:03:36][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:36][136521038427712[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:36][136521038427712[INFO][asynclogger][Service.hpp:551]	uncompressing:./deep_storage/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:36][136521038427712[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:36][136521038427712[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
+[21:03:48][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /delete
+[21:03:48][136521038427712[INFO][asynclogger][Service.hpp:360]	Delete start
+[21:03:48][136521038427712[INFO][asynclogger][Service.hpp:399]	remove file success: ./deep_storage/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:48][136521038427712[INFO][asynclogger][DataManager.hpp:172]	data_message Delete start, url: /download/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:48][136521038427712[INFO][asynclogger][DataManager.hpp:100]	message storage start
+[21:03:48][136521038427712[INFO][asynclogger][DataManager.hpp:123]	new message for StorageInfo:null
+[21:03:48][136521038427712[INFO][asynclogger][DataManager.hpp:136]	message storage end
+[21:03:48][136521038427712[INFO][asynclogger][DataManager.hpp:190]	data_message Delete end
+[21:03:48][136521038427712[INFO][asynclogger][Service.hpp:405]	Delete Meta Success: /download/南京邮电大学大学生菁英人才学校学员信息登记表.docx
+[21:03:49][136521038427712[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[21:03:49][136521038427712[INFO][asynclogger][Service.hpp:478]	ListShow()
+[21:03:49][136521038427712[INFO][asynclogger][Service.hpp:516]	ListShow() finish

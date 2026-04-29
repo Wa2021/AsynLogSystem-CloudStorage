@@ -1,0 +1,32 @@
+[10:51:58][130691284824576[INFO][asynclogger][DataManager.hpp:52]	DataManager construct start
+[10:51:58][130691284824576[INFO][asynclogger][Config.hpp:38]	ReadConfig start
+[10:51:58][130691284824576[INFO][asynclogger][Config.hpp:31]	ReadConfig complicate
+[10:51:58][130691284824576[INFO][asynclogger][DataManager.hpp:67]	init datamanager
+[10:51:58][130691284824576[INFO][asynclogger][DataManager.hpp:58]	DataManager construct end
+[10:51:58][130691022976576[DEBUG][asynclogger][Service.hpp:30]	Service start(Construct)
+[10:51:58][130691022976576[DEBUG][asynclogger][Service.hpp:36]	Service end(Construct)
+[10:51:58][130691022976576[INFO][asynclogger][Test.cpp:17]	service step in RunModule
+[10:51:58][130691022976576[DEBUG][asynclogger][Service.hpp:68]	event_base_dispatch
+[10:52:02][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /
+[10:52:02][130691022976576[INFO][asynclogger][Service.hpp:478]	ListShow()
+[10:52:02][130691022976576[INFO][asynclogger][Service.hpp:516]	ListShow() finish
+[10:52:26][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/bigfile.dat
+[10:52:26][130691022976576[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/bigfile.dat
+[10:52:26][130691022976576[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/bigfile.dat
+[10:52:26][130691022976576[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
+[10:52:28][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/bigfile.dat
+[10:52:28][130691022976576[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/bigfile.dat
+[10:52:28][130691022976576[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/bigfile.dat
+[10:52:28][130691022976576[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
+[10:52:29][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/bigfile.dat
+[10:52:29][130691022976576[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/bigfile.dat
+[10:52:29][130691022976576[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/bigfile.dat
+[10:52:29][130691022976576[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
+[10:52:30][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/bigfile.dat
+[10:52:30][130691022976576[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/bigfile.dat
+[10:52:30][130691022976576[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/bigfile.dat
+[10:52:30][130691022976576[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
+[10:52:31][130691022976576[INFO][asynclogger][Service.hpp:92]	get req, uri: /download/bigfile.dat
+[10:52:31][130691022976576[INFO][asynclogger][Service.hpp:545]	request resource_path:/download/bigfile.dat
+[10:52:31][130691022976576[INFO][asynclogger][Service.hpp:559]	request download_path:./low_storage/bigfile.dat
+[10:52:31][130691022976576[INFO][asynclogger][Service.hpp:668]	evhttp_send_reply: HTTP_OK
