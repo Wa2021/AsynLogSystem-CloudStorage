@@ -1,0 +1,36 @@
+# Build outputs
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Common C/C++ build folders
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Runtime logs and generated data
+*.log
+src/server/logfile/
+log_system/logs_code/backlog/*.log
+log_system/logs_code/backlog/a.out
+storage.data
+src/server/storage.data
+
+# Local test binaries and fixtures
+src/server/test
+src/server/bench_log
+src/server/low_storage/*.pptx
