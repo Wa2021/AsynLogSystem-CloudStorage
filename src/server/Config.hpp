@@ -46,7 +46,29 @@ namespace storage
             }
 
             Json::Value root;
-            storage::JsonUtil::UnSerialize(content, &root); // 反序列化，把内容转成jaon value格式
+            if (!storage::JsonUtil::UnSerialize(content, &root)) // 反序列化，把内容转成jaon value格式
+            {
+                mylog::GetLogger("asynclogger")->Error("Parse Storage.conf failed");
+                return false;
+            }
+
+            const char *required_fields[] = {
+                "server_port",
+                "server_ip",
+                "download_prefix",
+                "deep_storage_dir",
+                "low_storage_dir",
+                "storage_info",
+                "bundle_format"
+            };
+            for (const char *field : required_fields)
+            {
+                if (!root.isMember(field))
+                {
+                    mylog::GetLogger("asynclogger")->Error("Storage.conf missing field: %s", field);
+                    return false;
+                }
+            }
 
             // 要记得转换的时候用上asint，asstring这种函数，json的数据类型是Value。
             server_port_ = root["server_port"].asInt();

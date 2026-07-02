@@ -38,9 +38,11 @@ namespace mylog
         }
         void Stop()
         {
-            stop_ = true;
+            if (stop_.exchange(true))
+                return;
             cond_consumer_.notify_all(); // 所有线程把缓冲区内数据处理完就结束了
-            thread_.join();
+            if (thread_.joinable())
+                thread_.join();
         }
 
     private:

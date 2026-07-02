@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <unistd.h>
 #include <regex>
 
 #include "base64.h" // 来自 cpp-base64 库
@@ -95,7 +96,13 @@ namespace storage
                 return;
             }
             std::string path = raw_path;
-            path = UrlDecode(path);
+            std::string decoded_path;
+            if (!UrlDecode(path, &decoded_path))
+            {
+                evhttp_send_reply(req, HTTP_BADREQUEST, "bad request", NULL);
+                return;
+            }
+            path = decoded_path;
             mylog::GetLogger("asynclogger")->Info("get req, uri: %s", path.c_str());
 
             // 统一鉴权：除了登录页面和登录接口，其他所有接口都需要验证
@@ -213,6 +220,37 @@ namespace storage
             return filename.find('/') == std::string::npos &&
                    filename.find('\\') == std::string::npos &&
                    filename.find('\0') == std::string::npos;
+        }
+
+        static std::string HtmlEscape(const std::string &text)
+        {
+            std::string escaped;
+            escaped.reserve(text.size());
+            for (char ch : text)
+            {
+                switch (ch)
+                {
+                case '&':
+                    escaped += "&amp;";
+                    break;
+                case '<':
+                    escaped += "&lt;";
+                    break;
+                case '>':
+                    escaped += "&gt;";
+                    break;
+                case '"':
+                    escaped += "&quot;";
+                    break;
+                case '\'':
+                    escaped += "&#39;";
+                    break;
+                default:
+                    escaped.push_back(ch);
+                    break;
+                }
+            }
+            return escaped;
         }
 
         static void LoginShow(struct evhttp_request *req, void *arg) {
@@ -416,7 +454,13 @@ namespace storage
             }
             std::string url = url_cstr;
             // 前端传过来的是 URI encode 过的，需要 decode 还原回原始路径，才能在 map 中找到 key
-            url = UrlDecode(url);
+            std::string decoded_url;
+            if (!UrlDecode(url, &decoded_url))
+            {
+                evhttp_send_reply(req, HTTP_BADREQUEST, "bad DeleteUrl", NULL);
+                return;
+            }
+            url = decoded_url;
 
             // 2. 根据 url 获取文件信息，为了拿到 storage_path 进行物理删除
             StorageInfo info;
@@ -467,6 +511,8 @@ namespace storage
             for (const auto &file : files)
             {
                 std::string filename = FileUtil(file.storage_path_).FileName();
+                std::string escaped_filename = HtmlEscape(filename);
+                std::string escaped_url = HtmlEscape(file.url_);
 
                 // 从路径中解析存储类型（示例逻辑，需根据实际路径规则调整）
                 std::string storage_type = "low";
@@ -477,7 +523,7 @@ namespace storage
 
                 ss << "<div class='file-item'>"
                    << "<div class='file-info'>"
-                   << "<span>📄" << filename << "</span>"
+                   << "<span>📄" << escaped_filename << "</span>"
                    << "<span class='file-type'>"
                    << (storage_type == "deep" ? "深度存储" : "普通存储")
                    << "</span>"
@@ -485,8 +531,8 @@ namespace storage
                    << "<span>" << TimetoStr(file.mtime_) << "</span>"
                    << "</div>"
                    << "<div style='display: flex; gap: 10px;'>"
-                   << "<button onclick=\"window.location='" << file.url_ << "'\">⬇️ 下载</button>"
-                   << "<button onclick=\"deleteFile('" << file.url_ << "')\" style='background-color: #e74c3c;'>🗑️ 删除</button>"
+                   << "<button data-url=\"" << escaped_url << "\" onclick=\"window.location=this.dataset.url\">⬇️ 下载</button>"
+                   << "<button data-url=\"" << escaped_url << "\" onclick=\"deleteFile(this.dataset.url)\" style='background-color: #e74c3c;'>🗑️ 删除</button>"
                    << "</div>"
                    << "</div>";
             }
@@ -579,7 +625,13 @@ namespace storage
                 return;
             }
             std::string resource_path = path;
-            resource_path = UrlDecode(resource_path);
+            std::string decoded_resource_path;
+            if (!UrlDecode(resource_path, &decoded_resource_path))
+            {
+                evhttp_send_reply(req, HTTP_BADREQUEST, "bad request", NULL);
+                return;
+            }
+            resource_path = decoded_resource_path;
             mylog::GetLogger("asynclogger")->Info("request resource_path:%s", resource_path.c_str());
             if (data_->GetOneByURL(resource_path, &info) == false)
             {
@@ -659,7 +711,8 @@ namespace storage
 
             // [新增] 解析 Range 头并确定发送范围
             long start_offset = 0;//开始位置默认为0
-            long length = fu.FileSize();//发送长度默认为整个文件大小
+            long fsize = fu.FileSize();// 获取文件大小
+            long length = fsize;//发送长度默认为整个文件大小
             
             // 只有当符合续传条件（retrans=true）且存在 Range 头时才解析，
             // 或者如果没有 If-Range 头但有 Range 头（通常也应视为续传请求）
@@ -668,33 +721,70 @@ namespace storage
             {
                 std::string range_val = range_header;
                 // Range 头的值，例如 "bytes=100-200" 或 "bytes=100-" 或 "bytes=-200"
-                // 简单的 Range 解析: bytes=start-
                 size_t eq_pos = range_val.find("=");
                 size_t minus_pos = range_val.find("-");
-                if (eq_pos != std::string::npos && minus_pos != std::string::npos) 
+                auto is_digits = [](const std::string &s) {
+                    if (s.empty()) return false;
+                    for (char ch : s) {
+                        if (ch < '0' || ch > '9') return false;
+                    }
+                    return true;
+                };
+                if (eq_pos != std::string::npos && minus_pos != std::string::npos &&
+                    range_val.substr(0, eq_pos) == "bytes")
                 {
-                    long fsize = fu.FileSize();// 获取文件大小
                     try {
                         std::string start_str = range_val.substr(eq_pos + 1, minus_pos - eq_pos - 1);
-                        //两个参数：start_pos是要提取的子字符串的起始位置，length是要提取的子字符串的长度
-                        start_offset = std::stol(start_str);
-                        
-                        // 如果有 end，解析 end (bytes=start-end)
                         std::string end_str = range_val.substr(minus_pos + 1);
-                        // 如果没有 end，默认为文件末尾 (bytes=start-)
-                        long end_offset = fsize - 1;
-                        if (!end_str.empty()) {
-                             end_offset = std::stol(end_str);
+
+                        if (fsize <= 0) {
+                            evhttp_add_header(req->output_headers, "Accept-Ranges", "bytes");
+                            evhttp_add_header(req->output_headers, "Content-Range", "bytes */0");
+                            evhttp_send_reply(req, 416, "Range Not Satisfiable", NULL);
+                            close(fd);
+                            return;
                         }
-                        
-                        if (start_offset < fsize) {
+
+                        if (start_str.empty() && is_digits(end_str)) {
+                            // bytes=-N: 返回文件末尾 N 个字节
+                            long suffix_len = std::stol(end_str);
+                            if (suffix_len <= 0) {
+                                std::string content_range = "bytes */" + std::to_string(fsize);
+                                evhttp_add_header(req->output_headers, "Accept-Ranges", "bytes");
+                                evhttp_add_header(req->output_headers, "Content-Range", content_range.c_str());
+                                evhttp_send_reply(req, 416, "Range Not Satisfiable", NULL);
+                                close(fd);
+                                return;
+                            }
+                            if (suffix_len >= fsize) {
+                                start_offset = 0;
+                                length = fsize;
+                            } else {
+                                start_offset = fsize - suffix_len;
+                                length = suffix_len;
+                            }
+                            retrans = true;
+                        }
+                        else if (is_digits(start_str) && (end_str.empty() || is_digits(end_str))) {
+                            start_offset = std::stol(start_str);
+                            // 如果没有 end，默认为文件末尾 (bytes=start-)
+                            long end_offset = end_str.empty() ? fsize - 1 : std::stol(end_str);
+                            if (start_offset >= fsize || start_offset > end_offset) {
+                                std::string content_range = "bytes */" + std::to_string(fsize);
+                                evhttp_add_header(req->output_headers, "Accept-Ranges", "bytes");
+                                evhttp_add_header(req->output_headers, "Content-Range", content_range.c_str());
+                                evhttp_send_reply(req, 416, "Range Not Satisfiable", NULL);
+                                close(fd);
+                                return;
+                            }
                             if (end_offset >= fsize) end_offset = fsize - 1;
                             length = end_offset - start_offset + 1;
                             retrans = true; // 确保设置为 true 以发送 206
                         } else {
+                            // 格式无法识别时保持兼容：回退为全量下载
                             start_offset = 0;
                             length = fsize;
-                            retrans = false; 
+                            retrans = false;
                         }
                     } catch (...) {
                         start_offset = 0;

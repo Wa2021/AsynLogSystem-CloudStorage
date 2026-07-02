@@ -36,10 +36,13 @@ namespace mylog
             // 获取可变参数列表中的格式
             va_list va;
             va_start(va, format);
-            char *ret;
+            char *ret = nullptr;
             int r = vasprintf(&ret, format.c_str(), va);
-            if (r == -1)
+            if (r == -1) {
                 perror("vasprintf failed!!!: ");
+                va_end(va);
+                return;
+            }
             va_end(va); // 将va指针置空
 
             serialize(LogLevel::value::DEBUG, file, line,
@@ -53,10 +56,13 @@ namespace mylog
         {
             va_list va;
             va_start(va, format);
-            char *ret;
+            char *ret = nullptr;
             int r = vasprintf(&ret, format.c_str(), va);
-            if (r == -1)
+            if (r == -1) {
                 perror("vasprintf failed!!!: ");
+                va_end(va);
+                return;
+            }
             va_end(va);
 
             serialize(LogLevel::value::INFO, file, line,
@@ -71,10 +77,13 @@ namespace mylog
         {
             va_list va;
             va_start(va, format);
-            char *ret;
+            char *ret = nullptr;
             int r = vasprintf(&ret, format.c_str(), va);
-            if (r == -1)
+            if (r == -1) {
                 perror("vasprintf failed!!!: ");
+                va_end(va);
+                return;
+            }
             va_end(va);
 
             serialize(LogLevel::value::WARN, file, line,
@@ -87,10 +96,13 @@ namespace mylog
         {
             va_list va;
             va_start(va, format);
-            char *ret;
+            char *ret = nullptr;
             int r = vasprintf(&ret, format.c_str(), va);
-            if (r == -1)
+            if (r == -1) {
                 perror("vasprintf failed!!!: ");
+                va_end(va);
+                return;
+            }
             va_end(va);
 
             serialize(LogLevel::value::ERROR, file, line,
@@ -104,10 +116,13 @@ namespace mylog
         {
             va_list va;
             va_start(va, format);
-            char *ret;
+            char *ret = nullptr;
             int r = vasprintf(&ret, format.c_str(), va);
-            if (r == -1)
+            if (r == -1) {
                 perror("vasprintf failed!!!: ");
+                va_end(va);
+                return;
+            }
             va_end(va);
 
             serialize(LogLevel::value::FATAL, file, line,

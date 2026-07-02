@@ -22,22 +22,21 @@ namespace storage
         return x > 9 ? x + 55 : x + 48;
     }
 
-    static unsigned char FromHex(unsigned char x)
+    static bool FromHex(unsigned char x, unsigned char *y)
     {
-        unsigned char y;
         if (x >= 'A' && x <= 'Z')
-            y = x - 'A' + 10;
+            *y = x - 'A' + 10;
         else if (x >= 'a' && x <= 'z')
-            y = x - 'a' + 10;
+            *y = x - 'a' + 10;
         else if (x >= '0' && x <= '9')
-            y = x - '0';
+            *y = x - '0';
         else
-            assert(0);
-        return y;
+            return false;
+        return true;
     }
-    static std::string UrlDecode(const std::string &str)
+    static bool UrlDecode(const std::string &str, std::string *out)
     {
-        std::string strTemp = "";
+        out->clear();
         size_t length = str.length();
         for (size_t i = 0; i < length; i++)
         {
@@ -45,15 +44,22 @@ namespace storage
             //     strTemp += ' ';
             if (str[i] == '%')
             {
-                assert(i + 2 < length);
-                unsigned char high = FromHex((unsigned char)str[++i]);
-                unsigned char low = FromHex((unsigned char)str[++i]);
-                strTemp += high * 16 + low;
+                if (i + 2 >= length)
+                    return false;
+                unsigned char high = 0;
+                unsigned char low = 0;
+                if (!FromHex((unsigned char)str[i + 1], &high) ||
+                    !FromHex((unsigned char)str[i + 2], &low))
+                {
+                    return false;
+                }
+                out->push_back(static_cast<char>(high * 16 + low));
+                i += 2;
             }
             else
-                strTemp += str[i];
+                out->push_back(str[i]);
         }
-        return strTemp;
+        return true;
     }
 
     class FileUtil
@@ -168,6 +174,7 @@ namespace storage
             {
                 mylog::GetLogger("asynclogger")->Info("%s, file set content error",filename_.c_str());
                 ofs.close();
+                return false;
             }
             ofs.close();
             return true;

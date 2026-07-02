@@ -1,5 +1,7 @@
 #pragma once
 #include "Config.hpp"
+#include <cstdio>
+#include <cstring>
 #include <unordered_map>
 #include <pthread.h>
 namespace storage
@@ -22,8 +24,8 @@ namespace storage
                 mylog::GetLogger("asynclogger")->Info("file not exists");
                 return false;
             }
-            mtime_ = f.LastAccessTime();
-            atime_ = f.LastModifyTime();
+            mtime_ = f.LastModifyTime();
+            atime_ = f.LastAccessTime();
             fsize_ = f.FileSize();
             storage_path_ = storage_path;
             // URL实际就是用户下载文件请求的路径
@@ -77,7 +79,11 @@ namespace storage
 
             // 反序列化
             Json::Value root;
-            storage::JsonUtil::UnSerialize(body, &root);
+            if (!storage::JsonUtil::UnSerialize(body, &root))
+            {
+                mylog::GetLogger("asynclogger")->Error("StorageInfo parse error");
+                return false;
+            }
             // 3，将反序列化得到的Json::Value中的数据添加到table中
             pthread_rwlock_wrlock(&rwlock_);
             for (int i = 0; i < root.size(); i++)
@@ -119,18 +125,26 @@ namespace storage
 
             // 序列化
             std::string body;
-            JsonUtil::Serialize(root, &body);
+            if (!JsonUtil::Serialize(root, &body))
+            {
+                mylog::GetLogger("asynclogger")->Error("StorageInfo serialize error");
+                return false;
+            }
             mylog::GetLogger("asynclogger")->Info("new message for StorageInfo:%s", body.c_str());    //打印序列化后的文件信息
 
             // 写入文件
-            FileUtil f(storage_file_);
-            
-            // 使用临时文件+原子重命名 (Rename) 来解决写入竞争或写入未完成时的读问题
-            // 但目前的 FileUtil::SetContent 似乎是直接覆盖写入
-            
+            std::string tmp_file = storage_file_ + ".tmp";
+            FileUtil f(tmp_file);
+
             if (f.SetContent(body.c_str(),body.size()) == false) {
                  mylog::GetLogger("asynclogger")->Error("SetContent for StorageInfo Error");
                  return false;
+            }
+            if (std::rename(tmp_file.c_str(), storage_file_.c_str()) != 0)
+            {
+                mylog::GetLogger("asynclogger")->Error("rename StorageInfo Error: %s", strerror(errno));
+                std::remove(tmp_file.c_str());
+                return false;
             }
 
             mylog::GetLogger("asynclogger")->Info("message storage end");

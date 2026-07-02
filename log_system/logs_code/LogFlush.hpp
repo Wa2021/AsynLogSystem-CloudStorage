@@ -37,9 +37,17 @@ namespace mylog{
                 perror(NULL);
             }
         }
+        ~FileFlush() override {
+            if (fs_ != NULL) {
+                fclose(fs_);
+                fs_ = NULL;
+            }
+        }
         void Flush(const char *data, size_t len) override{
-            fwrite(data,1,len,fs_);
-            if(ferror(fs_)){
+            if (fs_ == NULL)
+                return;
+            size_t write_size = fwrite(data,1,len,fs_);
+            if(write_size != len || ferror(fs_)){
                 std::cout <<__FILE__<<__LINE__<<"write log file failed"<< std::endl;
                 perror(NULL);
             }
@@ -68,18 +76,26 @@ namespace mylog{
         {
             Util::File::CreateDirectory(Util::File::Path(filename));
         }
+        ~RollFileFlush() override {
+            if (fs_ != NULL) {
+                fclose(fs_);
+                fs_ = NULL;
+            }
+        }
 
         void Flush(const char *data, size_t len) override
         {
             // 确认文件大小不满足滚动需求
             InitLogFile();
+            if (fs_ == NULL)
+                return;
             // 向文件写入内容
-            fwrite(data, 1, len, fs_);
-            if(ferror(fs_)){
+            size_t write_size = fwrite(data, 1, len, fs_);
+            if(write_size != len || ferror(fs_)){
                 std::cout <<__FILE__<<__LINE__<<"write log file failed"<< std::endl;
                 perror(NULL);
             }
-            cur_size_ += len;
+            cur_size_ += write_size;
             if(g_conf_data->flush_log == 1){
                 if(fflush(fs_)){
                     std::cout <<__FILE__<<__LINE__<<"fflush file failed"<< std::endl;
