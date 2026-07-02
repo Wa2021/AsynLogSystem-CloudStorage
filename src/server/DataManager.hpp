@@ -179,14 +179,14 @@ namespace storage
                 return false;
             }
             table_.erase(it);
+            pthread_rwlock_unlock(&rwlock_);
+
             if (need_persist_ == true && Storage() == false)
             {
                 mylog::GetLogger("asynclogger")->Error("data_message Delete:Storage Error");
                 // 此时虽然内存删除了，但持久化失败，严格来说有点问题，但这里先返回false
-                pthread_rwlock_unlock(&rwlock_);
                 return false;
             }
-            pthread_rwlock_unlock(&rwlock_);
             mylog::GetLogger("asynclogger")->Info("data_message Delete end");
             return true;
         }

@@ -18,6 +18,7 @@ using std::endl;
 
 using func_t = std::function<void(const std::string &)>;
 const int backlog = 32;
+const size_t max_backup_message_size = 1024 * 1024;
 
 class TcpServer;
 //该类包含客户端的ip和端口信息
@@ -107,6 +108,8 @@ public:
         while (true) {
             ssize_t r_ret = read(sock, buf, sizeof(buf));
             if (r_ret < 0) {
+                if (errno == EINTR)
+                    continue;
                 std::cout << __FILE__ << __LINE__ <<"read error"<< strerror(errno)<< std::endl;
                 perror("NULL");
                 return;
@@ -114,11 +117,15 @@ public:
             if (r_ret == 0) {
                 break;
             }
+            if (tmp.size() + static_cast<size_t>(r_ret) > max_backup_message_size) {
+                std::cout << __FILE__ << __LINE__ << "backup message too large" << std::endl;
+                return;
+            }
             tmp.append(buf, static_cast<size_t>(r_ret));
         }
 
         if (!tmp.empty()) {
-            func_(client_info + tmp); // 进行回调
+            func_(client_info + " " + tmp); // 进行回调
         }
     }
     ~TcpServer()=default;

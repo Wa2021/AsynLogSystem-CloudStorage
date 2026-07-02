@@ -271,7 +271,7 @@ namespace storage
                 mylog::GetLogger("asynclogger")->Info("parse error");
                 return false;
             }
-            return false;
+            return true;
         }
     };
 }

@@ -141,7 +141,7 @@ namespace mylog
                     std::cout <<__FILE__<<__LINE__<<"parse error" << err<<std::endl;
                     return false;
                 }
-                return false;
+                return true;
             }
         };
         struct JsonData{

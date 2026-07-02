@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
+#include <mutex>
 #include <unistd.h>
 #include <memory>
 #include <sys/stat.h>
@@ -14,6 +15,7 @@
 using std::cout;
 using std::endl;
 const std::string filename = "./logfile.log";
+std::mutex backup_file_mutex;
 void usage(std::string procgress)
 {
     cout << "usage error:" << procgress << "port" << endl;
@@ -26,13 +28,14 @@ bool file_exist(const std::string &name)
 
 void backup_log(const std::string &message)//用作回调
 {
+    std::lock_guard<std::mutex> lock(backup_file_mutex);
     FILE *fp = fopen(filename.c_str(), "ab");
     if (fp == NULL)
     {
         perror("fopen error: ");
         assert(false);
     }
-    int write_byte = fwrite(message.c_str(), 1, message.size(), fp);
+    size_t write_byte = fwrite(message.c_str(), 1, message.size(), fp);
     if (write_byte != message.size())
     {
         perror("fwrite error: ");

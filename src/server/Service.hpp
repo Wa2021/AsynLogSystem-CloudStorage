@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <cerrno>
+#include <cstring>
 #include <regex>
 
 #include "base64.h" // 来自 cpp-base64 库
@@ -87,7 +88,13 @@ namespace storage
     private:
         static void GenHandler(struct evhttp_request *req, void *arg)
         {
-            std::string path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            const char *raw_path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            if (raw_path == nullptr)
+            {
+                evhttp_send_reply(req, HTTP_BADREQUEST, "bad request", NULL);
+                return;
+            }
+            std::string path = raw_path;
             path = UrlDecode(path);
             mylog::GetLogger("asynclogger")->Info("get req, uri: %s", path.c_str());
 
@@ -169,7 +176,10 @@ namespace storage
         // 检查请求是否包含正确的 Cookie 或 Header
         static bool CheckAuth(struct evhttp_request *req) {
             // 登录页面和登录接口不需要验证
-            std::string path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            const char *raw_path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            if (raw_path == nullptr)
+                return false;
+            std::string path = raw_path;
             if (path == "/login" || path == "/api/login") {
                 return true;
             }
@@ -194,6 +204,15 @@ namespace storage
             }
 
             return false;
+        }
+
+        static bool IsSafeFileName(const std::string &filename)
+        {
+            if (filename.empty() || filename == "." || filename == "..")
+                return false;
+            return filename.find('/') == std::string::npos &&
+                   filename.find('\\') == std::string::npos &&
+                   filename.find('\0') == std::string::npos;
         }
 
         static void LoginShow(struct evhttp_request *req, void *arg) {
@@ -251,11 +270,10 @@ namespace storage
             // CheckAuth 已在 GenHandler 中统一调用
             // 获取请求体内容
             struct evbuffer *buf = evhttp_request_get_input_buffer(req);
-            
-            if (buf == nullptr)
             if (buf == nullptr)
             {
                 mylog::GetLogger("asynclogger")->Info("evhttp_request_get_input_buffer is empty");
+                evhttp_send_reply(req, HTTP_BADREQUEST, "request body empty", NULL);
                 return;
             }
 
@@ -277,12 +295,32 @@ namespace storage
             }
 
             // 获取文件名
-            std::string filename = evhttp_find_header(req->input_headers, "FileName");
+            const char *filename_header = evhttp_find_header(req->input_headers, "FileName");
+            if (filename_header == nullptr || strlen(filename_header) == 0)
+            {
+                mylog::GetLogger("asynclogger")->Info("FileName header empty");
+                evhttp_send_reply(req, HTTP_BADREQUEST, "FileName empty", NULL);
+                return;
+            }
+            std::string filename = filename_header;
             // 解码文件名
             filename = base64_decode(filename);
+            if (!IsSafeFileName(filename))
+            {
+                mylog::GetLogger("asynclogger")->Warn("unsafe filename: %s", filename.c_str());
+                evhttp_send_reply(req, HTTP_BADREQUEST, "Illegal filename", NULL);
+                return;
+            }
 
             // 获取存储类型，客户端自定义请求头 StorageType
-            std::string storage_type = evhttp_find_header(req->input_headers, "StorageType");
+            const char *storage_type_header = evhttp_find_header(req->input_headers, "StorageType");
+            if (storage_type_header == nullptr || strlen(storage_type_header) == 0)
+            {
+                mylog::GetLogger("asynclogger")->Info("StorageType header empty");
+                evhttp_send_reply(req, HTTP_BADREQUEST, "StorageType empty", NULL);
+                return;
+            }
+            std::string storage_type = storage_type_header;
             // 组织存储路径
             std::string storage_path;
             if (storage_type == "low")
@@ -312,7 +350,7 @@ namespace storage
 
             // 看路径里是low还是deep存储，是deep就压缩，是low就直接写入
             FileUtil fu(storage_path);
-            if (storage_path.find("low_storage") != std::string::npos)
+            if (storage_type == "low")
             {
                 if (fu.SetContent(content.c_str(), len) == false)
                 {
@@ -341,8 +379,16 @@ namespace storage
 
             // 添加存储文件信息，交由数据管理类进行管理
             StorageInfo info;
-            info.NewStorageInfo(storage_path); // 组织存储的文件信息
-            data_->Insert(info);               // 向数据管理模块添加存储的文件信息
+            if (info.NewStorageInfo(storage_path) == false) // 组织存储的文件信息
+            {
+                evhttp_send_reply(req, HTTP_INTERNAL, "storage info error", NULL);
+                return;
+            }
+            if (data_->Insert(info) == false) // 向数据管理模块添加存储的文件信息
+            {
+                evhttp_send_reply(req, HTTP_INTERNAL, "metadata error", NULL);
+                return;
+            }
 
             evhttp_send_reply(req, HTTP_OK, "Success", NULL);
             mylog::GetLogger("asynclogger")->Info("upload finish:success");
@@ -526,10 +572,21 @@ namespace storage
             // 1. 获取客户端请求的资源路径path   req.path
             // 2. 根据资源路径，获取StorageInfo
             StorageInfo info;
-            std::string resource_path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            const char *path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
+            if (path == nullptr)
+            {
+                evhttp_send_reply(req, HTTP_BADREQUEST, "bad request", NULL);
+                return;
+            }
+            std::string resource_path = path;
             resource_path = UrlDecode(resource_path);
-            data_->GetOneByURL(resource_path, &info);
             mylog::GetLogger("asynclogger")->Info("request resource_path:%s", resource_path.c_str());
+            if (data_->GetOneByURL(resource_path, &info) == false)
+            {
+                mylog::GetLogger("asynclogger")->Info("download resource not found: %s", resource_path.c_str());
+                evhttp_send_reply(req, HTTP_NOTFOUND, "file not found", NULL);
+                return;
+            }
 
             std::string download_path = info.storage_path_;
             // 2.如果压缩过了就解压到新文件给用户下载
@@ -541,7 +598,12 @@ namespace storage
                                 std::string(download_path.begin() + download_path.find_last_of('/') + 1, download_path.end());
                 FileUtil dirCreate(Config::GetInstance()->GetLowStorageDir());
                 dirCreate.CreateDirectory();
-                fu.UnCompress(download_path); // 将文件解压到low_storage下去或者再创一个文件夹做中转
+                if (fu.UnCompress(download_path) == false)
+                {
+                    mylog::GetLogger("asynclogger")->Info("evhttp_send_reply: 500 - UnCompress failed");
+                    evhttp_send_reply(req, HTTP_INTERNAL, "uncompress failed", NULL);
+                    return;
+                }
             }
             mylog::GetLogger("asynclogger")->Info("request download_path:%s", download_path.c_str());
             FileUtil fu(download_path);
@@ -550,6 +612,7 @@ namespace storage
                 // 如果是压缩文件，且解压失败，是服务端的错误
                 mylog::GetLogger("asynclogger")->Info("evhttp_send_reply: 500 - UnCompress failed");
                 evhttp_send_reply(req, HTTP_INTERNAL, NULL, NULL);
+                return;
             }
 
             //这个else if是没用的，不看就行
@@ -558,6 +621,7 @@ namespace storage
                 // 如果是普通文件，且文件不存在，是客户端的错误
                 mylog::GetLogger("asynclogger")->Info("evhttp_send_reply: 400 - bad request,file not exists");
                 evhttp_send_reply(req, HTTP_BADREQUEST, "file not exists", NULL);
+                return;
             }
 
             // 3.确认文件是否需要断点续传
