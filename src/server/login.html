@@ -101,15 +101,15 @@
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {
-                        'Password': password
-                    }
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
+                    body: password
                 });
 
                 if (response.ok) {
-                    // 登录成功，浏览器会自动处理 Set-Cookie
-                    // 设置 sessionStorage 标记当前 Tab 已登录
-                    sessionStorage.setItem('is_logged_in', 'true');
                     window.location.href = '/';
+                } else if (response.status === 429) {
+                    alert('尝试次数过多，请稍后再试');
                 } else {
                     alert('密码错误');
                 }

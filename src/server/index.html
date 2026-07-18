@@ -144,11 +144,37 @@
             border-radius: 5px;
             font-size: 0.9rem;
         }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .delete-btn {
+            background-color: #e74c3c;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 1rem;
+            }
+
+            .file-item,
+            .file-info {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .file-actions {
+                margin-top: 1rem;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <button class="logout-btn" onclick="logout()">退出</button>
         <h1>📁异步日志存储系统</h1>
 
         <div class="upload-section">
@@ -195,19 +221,16 @@
     </div>
 
     <script>
-        // 动态配置注入
-        const config = {
-            backendUrl: '{{BACKEND_URL}}'
-        };
-
-        // 页面初始化：检查登录状态
-        window.addEventListener('load', function() { // 使用 addEventListener
-          // 如果没有 sessionStorage 标记（说明是新标签页/重新打开），但可能浏览器还存着 Cookie
-          // 此时我们强制跳转到登录页，要求用户再次输入密码
-          if (!sessionStorage.getItem('is_logged_in')) {
-              window.location.href = '/login';
-          }
-        });
+        function getCookie(name) {
+            const prefix = name + '=';
+            for (const item of document.cookie.split(';')) {
+                const cookie = item.trim();
+                if (cookie.startsWith(prefix)) {
+                    return cookie.substring(prefix.length);
+                }
+            }
+            return '';
+        }
 
         async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
@@ -219,42 +242,23 @@
                 return;
             }
 
-            // check duplicate file
-            const fileList = document.querySelector('.file-list');
-            if (fileList) {
-                const items = fileList.getElementsByClassName('file-item');
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const nameSpan = item.getElementsByTagName('span')[0];
-                    if (nameSpan) {
-                         const txtValue = nameSpan.textContent || nameSpan.innerText;
-                         const cleanTxt = txtValue.replace('📄', '').trim();
-                         if (cleanTxt === file.name.trim()) {
-                             if (!confirm('文件 "' + cleanTxt + '" 已存在。是否覆盖？')) {
-                                 return;
-                             }
-                             break;
-                         }
-                    }
-                }
-            }
-
-            // // Base64 编码
             const encodedFilename = btoa(unescape(encodeURIComponent(file.name)));
-            console.log("Base64 编码结果:", encodedFilename);
 
             try {
-                const response = await fetch(`${config.backendUrl}/upload`, {
+                const response = await fetch('/upload', {
                     method: 'POST',
                     headers: {
                         'StorageType': storageType,
-                        'FileName': encodedFilename // 使用 Base64 编码
+                        'FileName': encodedFilename,
+                        'X-CSRF-Token': getCookie('csrf')
                     },
                     body: file
                 });
 
                 if (response.ok) {
                     location.reload();
+                } else if (response.status === 409) {
+                    alert('上传失败：已存在同名文件');
                 } else {
                     alert(`上传失败: ${response.status}`);
                 }
@@ -269,12 +273,11 @@
                 return;
             }
             try {
-                // HTTP header 中不能包含中文，所以需要 encode
-                const encodedUrl = encodeURIComponent(url);
-                const response = await fetch(`${config.backendUrl}/delete`, {
+                const response = await fetch('/delete', {
                     method: 'POST',
                     headers: {
-                        'DeleteUrl': encodedUrl
+                        'DeleteUrl': url,
+                        'X-CSRF-Token': getCookie('csrf')
                     }
                 });
 
@@ -287,6 +290,19 @@
             } catch (error) {
                 console.error('删除错误:', error);
                 alert('网络错误');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': getCookie('csrf')
+                    }
+                });
+            } finally {
+                window.location.href = '/login';
             }
         }
 

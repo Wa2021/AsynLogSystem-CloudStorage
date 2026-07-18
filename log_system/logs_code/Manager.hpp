@@ -1,57 +1,68 @@
-#include<unordered_map>
-#include"AsyncLogger.hpp"
+#pragma once
 
-namespace mylog{
-    // 通过单例对象对日志器进行管理，懒汉模式
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+
+#include "AsyncLogger.hpp"
+
+namespace mylog
+{
     class LoggerManager
     {
     public:
         static LoggerManager &GetInstance()
         {
-            static LoggerManager eton;
-            return eton;
+            static LoggerManager instance;
+            return instance;
         }
 
-        bool LoggerExist(const std::string &name)
+        bool AddLogger(const AsyncLogger::ptr &logger)
         {
-            std::unique_lock<std::mutex> lock(mtx_);
-            auto it = loggers_.find(name);
-            if (it == loggers_.end())
+            if (logger == nullptr)
                 return false;
-            return true;
-        }
-
-        void AddLogger(const AsyncLogger::ptr &&AsyncLogger)
-        {
-            if (LoggerExist(AsyncLogger->Name()))
-                return;
-            std::unique_lock<std::mutex> lock(mtx_);
-            loggers_.insert(std::make_pair(AsyncLogger->Name(), AsyncLogger));
+            std::lock_guard<std::mutex> lock(mutex_);
+            return loggers_.emplace(logger->Name(), logger).second;
         }
 
         AsyncLogger::ptr GetLogger(const std::string &name)
         {
-            std::unique_lock<std::mutex> lock(mtx_);
-            auto it = loggers_.find(name);
-            if (it == loggers_.end())
-                return AsyncLogger::ptr();
-            return it->second;
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto iterator = loggers_.find(name);
+            return iterator == loggers_.end() ? default_logger_ : iterator->second;
         }
 
-        AsyncLogger::ptr DefaultLogger() { return default_logger_; }
+        AsyncLogger::ptr DefaultLogger()
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            return default_logger_;
+        }
+
+        void Shutdown()
+        {
+            std::unordered_map<std::string, AsyncLogger::ptr> loggers;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                loggers.swap(loggers_);
+                default_logger_.reset();
+            }
+            for (auto &entry : loggers)
+                entry.second->Stop();
+        }
 
     private:
         LoggerManager()
         {
-            std::unique_ptr<LoggerBuilder> builder(new LoggerBuilder());
-            builder->BuildLoggerName("default");
-            default_logger_ = builder->Build();
-            loggers_.insert(std::make_pair("default", default_logger_));
+            LoggerBuilder builder;
+            builder.BuildLoggerName("default");
+            default_logger_ = builder.Build();
+            loggers_.emplace(default_logger_->Name(), default_logger_);
         }
 
     private:
-        std::mutex mtx_;
-        AsyncLogger::ptr default_logger_;                              // 默认日志器
-        std::unordered_map<std::string, AsyncLogger::ptr> loggers_; // 存放日志器
+        std::mutex mutex_;
+        AsyncLogger::ptr default_logger_;
+        std::unordered_map<std::string, AsyncLogger::ptr> loggers_;
     };
-}
+} // namespace mylog

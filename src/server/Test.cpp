@@ -1,43 +1,59 @@
-/* ************************************************************************
-> File Name:     test.cpp
-> Created Time:  Thu 07 Sep 2023 06:37:16 PM CST
-> Description:
- ************************************************************************/
-#define DEBUG_LOG
+#include <cstdlib>
+#include <exception>
+#include <iostream>
+#include <memory>
+
 #include "Service.hpp"
-#include <thread>
-using namespace std;
+#include "../../log_system/logs_code/MyLog.hpp"
+#include "../../log_system/logs_code/ThreadPool.hpp"
 
-storage::DataManager *data_;
-ThreadPool* tp=nullptr;
-mylog::Util::JsonData* g_conf_data;
-void service_module()
+ThreadPool *tp = nullptr;
+mylog::Util::JsonData *g_conf_data = nullptr;
+
+int main(int argc, char *argv[])
 {
-    storage::Service s;
-    mylog::GetLogger("asynclogger")->Info("service step in RunModule");
-    s.RunModule();
-}
+    if (argc > 2)
+    {
+        std::cerr << "usage: " << argv[0] << " [Storage.conf]" << std::endl;
+        return 2;
+    }
+    if (argc == 2)
+        setenv("CLOUD_STORAGE_CONFIG", argv[1], 1);
 
-void log_system_module_init()
-{
-    g_conf_data = mylog::Util::JsonData::GetJsonData();
-    tp = new ThreadPool(g_conf_data->thread_count);
-    std::shared_ptr<mylog::LoggerBuilder> Glb(new mylog::LoggerBuilder());
-    Glb->BuildLoggerName("asynclogger");
-    Glb->BuildLoggerFlush<mylog::RollFileFlush>("./logfile/RollFile_log",
-                                              1024 * 1024);
-    // The LoggerManger has been built and is managed by members of the LoggerManger class
-    //The logger is assigned to the managed object, and the caller lands the log by invoking the singleton managed object
-    mylog::LoggerManager::GetInstance().AddLogger(Glb->Build());
-}
-int main()
-{
-    log_system_module_init();
-    data_ = new storage::DataManager();
+    std::unique_ptr<ThreadPool> thread_pool;
+    bool logger_initialized = false;
+    try
+    {
+        g_conf_data = mylog::Util::JsonData::GetJsonData();
+        thread_pool = std::make_unique<ThreadPool>(
+            g_conf_data->thread_count, g_conf_data->backup_queue_size);
+        tp = thread_pool.get();
 
-    thread t1(service_module);
+        mylog::LoggerBuilder builder;
+        builder.BuildLoggerName("asynclogger");
+        builder.BuildLoggerFlush<mylog::RollFileFlush>("./logfile/cloud-storage",
+                                                       1024 * 1024);
+        if (!mylog::LoggerManager::GetInstance().AddLogger(builder.Build()))
+            throw std::runtime_error("cannot register application logger");
+        logger_initialized = true;
 
-    t1.join();
-    delete(tp);
-    return 0;
+        storage::DataManager data_manager;
+        storage::Service service(data_manager);
+        bool success = service.RunModule();
+
+        mylog::LoggerManager::GetInstance().Shutdown();
+        logger_initialized = false;
+        thread_pool.reset();
+        tp = nullptr;
+        return success ? 0 : 1;
+    }
+    catch (const std::exception &error)
+    {
+        std::cerr << "startup failed: " << error.what() << std::endl;
+        if (logger_initialized)
+            mylog::LoggerManager::GetInstance().Shutdown();
+        thread_pool.reset();
+        tp = nullptr;
+        return 1;
+    }
 }

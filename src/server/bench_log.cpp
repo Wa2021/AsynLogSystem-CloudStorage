@@ -3,6 +3,7 @@
 #include <vector>
 #include <chrono>
 #include "../../log_system/logs_code/MyLog.hpp"
+#include "../../log_system/logs_code/ThreadPool.hpp"
 #include "../../log_system/logs_code/Util.hpp"
 
 using namespace std::chrono;
@@ -12,7 +13,7 @@ ThreadPool* tp = nullptr;
 
 void init_log() {
     g_conf_data = mylog::Util::JsonData::GetJsonData();
-    tp = new ThreadPool(g_conf_data->thread_count);
+    tp = new ThreadPool(g_conf_data->thread_count, g_conf_data->backup_queue_size);
     std::shared_ptr<mylog::LoggerBuilder> Glb(new mylog::LoggerBuilder());
     Glb->BuildLoggerName("benchlogger");
     // 这里使用纯写文件，屏蔽向终端打印，以测磁盘IO极限
@@ -35,15 +36,14 @@ int main() {
     for (int i = 0; i < thread_count; ++i) {
         threads.emplace_back([&]() {
             for (int j = 0; j < logs_per_thread; ++j) {
-                logger->Info("Bench test message: %s", test_msg.c_str());
+                MYLOG_INFO(logger, "Bench test message: %s", test_msg.c_str());
             }
         });
     }
     
     for (auto& t : threads) { t.join(); }
     
-    // 等到异步缓存的剩余日志全刷完(可在这个位置睡眠2秒让异步队列清理空)
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    logger->Stop();
 
     auto end = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(end - start);
@@ -57,6 +57,9 @@ int main() {
     std::cout << "测试耗时: " << duration.count() << " ms" << std::endl;
     std::cout << "总输出量: " << total_mb << " MB" << std::endl;
     std::cout << "吞吐量: " << speed << " MB/s" << std::endl;
-    
+
+    mylog::LoggerManager::GetInstance().Shutdown();
+    delete tp;
+    tp = nullptr;
     return 0;
 }

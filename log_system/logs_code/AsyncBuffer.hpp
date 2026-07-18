@@ -1,84 +1,85 @@
-/*日志缓冲区类设计*/
 #pragma once
-#include <cassert>
-#include <string>
+
+#include <algorithm>
+#include <cstddef>
+#include <limits>
+#include <stdexcept>
 #include <vector>
+
 #include "Util.hpp"
 
-extern mylog::Util::JsonData* g_conf_data;
+extern mylog::Util::JsonData *g_conf_data;
 
-namespace mylog{
-    class Buffer{
+namespace mylog
+{
+    class Buffer
+    {
     public:
-        Buffer() : write_pos_(0), read_pos_(0) {
+        Buffer()
+        {
+            if (g_conf_data == nullptr || g_conf_data->buffer_size == 0)
+                throw std::runtime_error("log configuration is not initialized");
             buffer_.resize(g_conf_data->buffer_size);
         }
 
         void Push(const char *data, size_t len)
         {
-            ToBeEnough(len); // 确保容量足够
-            // 开始写入
-            std::copy(data, data + len, &buffer_[write_pos_]);
+            if (len == 0)
+                return;
+            if (data == nullptr)
+                throw std::invalid_argument("cannot append null log data");
+            EnsureWritable(len);
+            std::copy_n(data, len, buffer_.data() + write_pos_);
             write_pos_ += len;
         }
-        char *ReadBegin(int len)
-        {
-            assert(len <= ReadableSize());
-            return &buffer_[read_pos_];
-        }
-        bool IsEmpty() { return write_pos_ == read_pos_; }
 
-        void Swap(Buffer &buf)
+        bool IsEmpty() const { return write_pos_ == read_pos_; }
+        size_t Capacity() const { return buffer_.size(); }
+        size_t WriteableSize() const { return buffer_.size() - write_pos_; }
+        size_t ReadableSize() const { return write_pos_ - read_pos_; }
+        const char *Begin() const { return buffer_.data() + read_pos_; }
+
+        void Swap(Buffer &other)
         {
-            buffer_.swap(buf.buffer_);
-            std::swap(read_pos_, buf.read_pos_);
-            std::swap(write_pos_, buf.write_pos_);
+            buffer_.swap(other.buffer_);
+            std::swap(read_pos_, other.read_pos_);
+            std::swap(write_pos_, other.write_pos_);
         }
-        size_t WriteableSize()
-        { // 写空间剩余容量
-            return buffer_.size() - write_pos_;
-        }
-        size_t ReadableSize()
-        { // 读空间剩余容量
-            return write_pos_ - read_pos_;
-        }
-        const char *Begin() { return &buffer_[read_pos_]; }
-        void MoveWritePos(int len)
-        {
-            assert(len <= WriteableSize());
-            write_pos_ += len;
-        }
-        void MoveReadPos(int len)
-        {
-            assert(len <= ReadableSize());
-            read_pos_ += len;
-        }
+
         void Reset()
-        { // 重置缓冲区
+        {
             write_pos_ = 0;
             read_pos_ = 0;
         }
 
-    protected:
-        void ToBeEnough(size_t len)
+    private:
+        void EnsureWritable(size_t len)
         {
-            int buffersize = buffer_.size();
-            if (len >= WriteableSize())
+            if (len <= WriteableSize())
+                return;
+            if (write_pos_ > std::numeric_limits<size_t>::max() - len)
+                throw std::length_error("log buffer size overflow");
+
+            const size_t required = write_pos_ + len;
+            size_t new_size = buffer_.size();
+            while (new_size < required)
             {
-                if (buffer_.size() < g_conf_data->threshold)
+                size_t growth = new_size < g_conf_data->threshold
+                                    ? std::max(new_size, static_cast<size_t>(1))
+                                    : g_conf_data->linear_growth;
+                if (growth > std::numeric_limits<size_t>::max() - new_size)
                 {
-                    buffer_.resize(2 * buffer_.size() + buffersize);
+                    new_size = required;
+                    break;
                 }
-                else
-                {
-                    buffer_.resize(g_conf_data->linear_growth + buffersize);
-                }
+                new_size += growth;
             }
+            buffer_.resize(new_size);
         }
 
-    protected:
-        std::vector<char> buffer_; // 缓冲区
-        size_t write_pos_;         // 生产者此时的位置
-        size_t read_pos_;          // 消费者此时的位置
+    private:
+        std::vector<char> buffer_;
+        size_t write_pos_ = 0;
+        size_t read_pos_ = 0;
     };
 } // namespace mylog

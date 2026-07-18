@@ -1,5 +1,5 @@
 #include "../logs_code/MyLog.hpp"
-#include "../logs_code/ThreadPoll.hpp"
+#include "../logs_code/ThreadPool.hpp"
 #include "../logs_code/Util.hpp"
 using std::cout;
 using std::endl;
@@ -10,16 +10,16 @@ void test() {
     int cur_size = 0;
     int cnt = 1;
     while (cur_size++ < 2) {
-        mylog::GetLogger("asynclogger")->Info("测试日志-%d", cnt++);
-        mylog::GetLogger("asynclogger")->Warn("测试日志-%d", cnt++);
-        mylog::GetLogger("asynclogger")->Debug("测试日志-%d", cnt++);
-        mylog::GetLogger("asynclogger")->Error("测试日志-%d", cnt++);
-        mylog::GetLogger("asynclogger")->Fatal("测试日志-%d", cnt++);
+        MYLOG_INFO(mylog::GetLogger("asynclogger"), "测试日志-%d", cnt++);
+        MYLOG_WARN(mylog::GetLogger("asynclogger"), "测试日志-%d", cnt++);
+        MYLOG_DEBUG(mylog::GetLogger("asynclogger"), "测试日志-%d", cnt++);
+        MYLOG_ERROR(mylog::GetLogger("asynclogger"), "测试日志-%d", cnt++);
+        MYLOG_FATAL(mylog::GetLogger("asynclogger"), "测试日志-%d", cnt++);
     }
 }
 
 void init_thread_pool() {
-    tp = new ThreadPool(g_conf_data->thread_count);
+    tp = new ThreadPool(g_conf_data->thread_count, g_conf_data->backup_queue_size);
 }
 int main() {
     g_conf_data = mylog::Util::JsonData::GetJsonData();
@@ -33,6 +33,8 @@ int main() {
     // 把日志器给管理对象，调用者通过调用单例管理对象对日志进行落地
     mylog::LoggerManager::GetInstance().AddLogger(Glb->Build());
     test();
+    mylog::LoggerManager::GetInstance().Shutdown();
     delete(tp);
+    tp = nullptr;
     return 0;
 }

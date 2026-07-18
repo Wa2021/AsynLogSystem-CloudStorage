@@ -70,6 +70,38 @@ static unsigned int pos_of_char(const unsigned char chr) {
     throw std::runtime_error("Input is not valid base64-encoded data.");
 }
 
+static bool is_base64_data_char(const unsigned char chr) {
+    return (chr >= 'A' && chr <= 'Z') ||
+           (chr >= 'a' && chr <= 'z') ||
+           (chr >= '0' && chr <= '9') || chr == '+' || chr == '-' ||
+           chr == '/' || chr == '_';
+}
+
+static bool is_valid_base64(const std::string& input) {
+    if (input.empty()) return true;
+    if (input.size() % 4 == 1) return false;
+
+    size_t padding = 0;
+    char padding_char = '\0';
+    while (padding < input.size() &&
+           (input[input.size() - padding - 1] == '=' ||
+            input[input.size() - padding - 1] == '.')) {
+        char current = input[input.size() - padding - 1];
+        if (padding_char == '\0') padding_char = current;
+        if (current != padding_char) return false;
+        ++padding;
+    }
+    if (padding > 2 || (padding != 0 && input.size() % 4 != 0)) return false;
+
+    const size_t data_length = input.size() - padding;
+    for (size_t index = 0; index < data_length; ++index) {
+        if (!is_base64_data_char(static_cast<unsigned char>(input[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static std::string insert_linebreaks(std::string str, size_t distance) {
  //
  // Provided by https://github.com/JomaCorpFX, adapted by me.
@@ -242,6 +274,22 @@ static std::string decode(String const& encoded_string, bool remove_linebreaks) 
 
 std::string base64_decode(std::string const& s, bool remove_linebreaks) {
    return decode(s, remove_linebreaks);
+}
+
+bool base64_decode(std::string const& s, std::string* output) noexcept {
+   if (output == nullptr) return false;
+   if (!is_valid_base64(s)) {
+      output->clear();
+      return false;
+   }
+   try {
+      *output = decode(s, false);
+      return true;
+   }
+   catch (const std::exception&) {
+      output->clear();
+      return false;
+   }
 }
 
 std::string base64_encode(std::string const& s, bool url) {

@@ -1,161 +1,194 @@
-#include <cassert>
-#include <fstream>
+#pragma once
+
+#include <chrono>
+#include <cstdio>
+#include <filesystem>
+#include <iomanip>
+#include <iostream>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <unistd.h>
+
 #include "Util.hpp"
 
-extern mylog::Util::JsonData* g_conf_data;
-namespace mylog{
+extern mylog::Util::JsonData *g_conf_data;
+
+namespace mylog
+{
     class LogFlush
     {
     public:
         using ptr = std::shared_ptr<LogFlush>;
-        virtual ~LogFlush() {}
-        virtual void Flush(const char *data, size_t len) = 0;//不同的写文件方式Flush的实现不同
+        virtual ~LogFlush() = default;
+        virtual void Flush(const char *data, size_t len) = 0;
     };
 
     class StdoutFlush : public LogFlush
     {
     public:
-        using ptr = std::shared_ptr<StdoutFlush>;
-        void Flush(const char *data, size_t len) override{
-            cout.write(data, len);
+        void Flush(const char *data, size_t len) override
+        {
+            std::cout.write(data, static_cast<std::streamsize>(len));
         }
     };
+
     class FileFlush : public LogFlush
     {
     public:
-        using ptr = std::shared_ptr<FileFlush>;
-        FileFlush(const std::string &filename) : filename_(filename)
+        explicit FileFlush(const std::string &filename)
         {
-            // 创建所给目录
-            Util::File::CreateDirectory(Util::File::Path(filename));
-            // 打开文件
-            fs_ = fopen(filename.c_str(), "ab");
-            if(fs_==NULL){
-                std::cout <<__FILE__<<__LINE__<<"open log file failed"<< std::endl;
-                perror(NULL);
-            }
+            if (!Util::File::CreateDirectory(Util::File::Path(filename)))
+                throw std::runtime_error("cannot create log directory");
+            file_ = fopen(filename.c_str(), "ab");
+            if (file_ == nullptr)
+                throw std::runtime_error("cannot open log file: " + filename);
         }
-        ~FileFlush() override {
-            if (fs_ != NULL) {
-                fclose(fs_);
-                fs_ = NULL;
-            }
+
+        ~FileFlush() override
+        {
+            if (file_ != nullptr)
+                fclose(file_);
         }
-        void Flush(const char *data, size_t len) override{
-            if (fs_ == NULL)
-                return;
-            size_t write_size = fwrite(data,1,len,fs_);
-            if(write_size != len || ferror(fs_)){
-                std::cout <<__FILE__<<__LINE__<<"write log file failed"<< std::endl;
-                perror(NULL);
+
+        void Flush(const char *data, size_t len) override
+        {
+            if (!WriteAll(file_, data, len))
+                std::perror("write log file failed");
+            ApplyFlushPolicy(file_);
+        }
+
+    public:
+        static bool WriteAll(FILE *file, const char *data, size_t len)
+        {
+            if (file == nullptr || (data == nullptr && len != 0))
+                return false;
+            size_t written = 0;
+            while (written < len)
+            {
+                size_t count = fwrite(data + written, 1, len - written, file);
+                if (count == 0)
+                    return false;
+                written += count;
             }
-            if(g_conf_data->flush_log == 1){
-                if(fflush(fs_)==EOF){
-                    std::cout <<__FILE__<<__LINE__<<"fflush file failed"<< std::endl;
-                    perror(NULL);
-                }
-            }else if(g_conf_data->flush_log == 2){
-                fflush(fs_);
-                fsync(fileno(fs_));
+            return ferror(file) == 0;
+        }
+
+        static bool ApplyFlushPolicy(FILE *file)
+        {
+            if (file == nullptr || g_conf_data == nullptr)
+                return false;
+            if (g_conf_data->flush_log >= 1 && fflush(file) == EOF)
+            {
+                std::perror("fflush log file failed");
+                return false;
             }
+            if (g_conf_data->flush_log == 2 && fsync(fileno(file)) == -1)
+            {
+                std::perror("fsync log file failed");
+                return false;
+            }
+            return true;
         }
 
     private:
-        std::string filename_;
-        FILE* fs_ = NULL; 
+        FILE *file_ = nullptr;
     };
 
     class RollFileFlush : public LogFlush
     {
     public:
-        using ptr = std::shared_ptr<RollFileFlush>;
-        RollFileFlush(const std::string &filename, size_t max_size)
-            : max_size_(max_size), basename_(filename)
+        RollFileFlush(const std::string &basename, size_t max_size)
+            : max_size_(max_size), basename_(basename)
         {
-            Util::File::CreateDirectory(Util::File::Path(filename));
+            if (max_size_ == 0)
+                throw std::invalid_argument("rolling log size must be positive");
+            if (!Util::File::CreateDirectory(Util::File::Path(basename_)))
+                throw std::runtime_error("cannot create rolling log directory");
         }
-        ~RollFileFlush() override {
-            if (fs_ != NULL) {
-                fclose(fs_);
-                fs_ = NULL;
-            }
+
+        ~RollFileFlush() override
+        {
+            if (file_ != nullptr)
+                fclose(file_);
         }
 
         void Flush(const char *data, size_t len) override
         {
-            // 确认文件大小不满足滚动需求
-            InitLogFile();
-            if (fs_ == NULL)
+            if (!EnsureFile(len))
                 return;
-            // 向文件写入内容
-            size_t write_size = fwrite(data, 1, len, fs_);
-            if(write_size != len || ferror(fs_)){
-                std::cout <<__FILE__<<__LINE__<<"write log file failed"<< std::endl;
-                perror(NULL);
+            if (!FileFlush::WriteAll(file_, data, len))
+            {
+                std::perror("write rolling log file failed");
+                return;
             }
-            cur_size_ += write_size;
-            if(g_conf_data->flush_log == 1){
-                if(fflush(fs_)){
-                    std::cout <<__FILE__<<__LINE__<<"fflush file failed"<< std::endl;
-                    perror(NULL);
-                }
-            }else if(g_conf_data->flush_log == 2){
-                fflush(fs_);
-                fsync(fileno(fs_));
-            }
+            current_size_ += len;
+            FileFlush::ApplyFlushPolicy(file_);
         }
 
     private:
-        void InitLogFile()
+        bool EnsureFile(size_t incoming_size)
         {
-            if (fs_==NULL || cur_size_ >= max_size_)
+            if (file_ != nullptr &&
+                (current_size_ == 0 || incoming_size <= max_size_ -
+                                                        std::min(current_size_, max_size_)))
+                return true;
+
+            if (file_ != nullptr)
             {
-                if(fs_!=NULL){
-                    fclose(fs_);
-                    fs_=NULL;
-                }   
-                std::string filename = CreateFilename();
-                fs_=fopen(filename.c_str(), "ab");
-                if(fs_==NULL){
-                    std::cout <<__FILE__<<__LINE__<<"open file failed"<< std::endl;
-                    perror(NULL);
-                }
-                cur_size_ = 0;
+                fclose(file_);
+                file_ = nullptr;
             }
+
+            const std::string filename = CreateFilename();
+            file_ = fopen(filename.c_str(), "ab");
+            if (file_ == nullptr)
+            {
+                std::perror("open rolling log file failed");
+                return false;
+            }
+
+            std::error_code ec;
+            current_size_ = static_cast<size_t>(
+                std::filesystem::file_size(filename, ec));
+            if (ec)
+                current_size_ = 0;
+            return true;
         }
 
-        // 构建落地的滚动日志文件名称
         std::string CreateFilename()
         {
-            time_t time_ = Util::Date::Now();
-            struct tm t;
-            localtime_r(&time_, &t);
-            std::string filename = basename_;
-            filename += std::to_string(t.tm_year + 1900);
-            filename += std::to_string(t.tm_mon + 1);
-            filename += std::to_string(t.tm_mday);
-            filename += std::to_string(t.tm_hour + 1);
-            filename += std::to_string(t.tm_min + 1);
-            filename += std::to_string(t.tm_sec + 1) + '-' +
-                        std::to_string(cnt_++) + ".log";
-            return filename;
+            const auto now = std::chrono::system_clock::now();
+            const time_t seconds = std::chrono::system_clock::to_time_t(now);
+            tm local_time{};
+            localtime_r(&seconds, &local_time);
+
+            char timestamp[32];
+            strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &local_time);
+            const auto micros = std::chrono::duration_cast<std::chrono::microseconds>(
+                                    now.time_since_epoch())
+                                    .count() %
+                                1000000;
+
+            std::ostringstream filename;
+            filename << basename_ << '-' << timestamp << '-' << std::setw(6)
+                     << std::setfill('0') << micros << '-' << getpid() << '-'
+                     << sequence_++ << ".log";
+            return filename.str();
         }
 
     private:
-        size_t cnt_ = 1;
-        size_t cur_size_ = 0;
         size_t max_size_;
         std::string basename_;
-        // std::ofstream ofs_;
-        FILE* fs_ = NULL;
+        size_t current_size_ = 0;
+        size_t sequence_ = 1;
+        FILE *file_ = nullptr;
     };
 
     class LogFlushFactory
     {
     public:
-        using ptr = std::shared_ptr<LogFlushFactory>;
         template <typename FlushType, typename... Args>
         static std::shared_ptr<LogFlush> CreateLog(Args &&...args)
         {
